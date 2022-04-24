@@ -4,5 +4,11 @@
 			"path": "."
 		}
 	],
-	"settings": {}
+	"settings": {
+		"files.associations": {
+			"thread": "cpp",
+			"iostream": "cpp",
+			"mutex": "cpp"
+		}
+	}
 }

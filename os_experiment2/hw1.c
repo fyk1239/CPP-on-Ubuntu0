@@ -18,8 +18,7 @@ int main()
 		else if (n == 1)
 			printf("0\n");
 		else if (n == 2)
-                        printf("0 1\n");
-
+            printf("0 1\n");
 		else
 		{
 			printf("0 1");
