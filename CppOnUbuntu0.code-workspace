@@ -8,7 +8,14 @@
 		"files.associations": {
 			"thread": "cpp",
 			"iostream": "cpp",
-			"mutex": "cpp"
+			"mutex": "cpp",
+			"*.tcc": "cpp",
+			"cstdlib": "cpp",
+			"memory": "cpp",
+			"string": "cpp",
+			"string_view": "cpp",
+			"ostream": "cpp",
+			"sstream": "cpp"
 		}
 	}
 }
