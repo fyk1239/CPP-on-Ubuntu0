@@ -111,6 +111,9 @@ void mem_state()
     printf("RAM state:\t");
     for (int i = 0; i < RAM_SIZE; i++)
         printf("%02x ", ram[i]);
+    // printf("\nRAM access:\t");
+    // for (int i = 0; i < RAM_SIZE; i++)
+    //     printf("%02x ", page_table[i].access);
     printf("\nswap state:\t");
     for (int i = 0; i < SWAP_SIZE; i++)
         printf("%02x ", swap[i]);
@@ -121,11 +124,10 @@ void mem_test()
 {
     char *ptr = new char();
     mem_state();
-
     mem_read(RAM_SIZE + 2, ptr); // 测试换页功能，换掉第一个页ram[0]
     printf("%x \n", *ptr);
     mem_state();
-    mem_read(1, ptr); // 读一遍ram[1]
+    mem_read(1, ptr);            // 读一遍ram[1]
     mem_read(RAM_SIZE + 5, ptr); // 测试，可以看到替换掉的不是ram[1]是ram[2]，测试正确
     printf("%x \n", *ptr);
     mem_state();
@@ -134,8 +136,15 @@ void mem_test()
     mem_read(RAM_SIZE + 7, ptr); // 这个时候替换的是ram[4]
     printf("%x \n", *ptr);
     mem_state();
-    // 刷新一次，把之前修改过的ram[3]轮换到下一个要被替换的位置
-    // 可以看到此时下一个就要换ram[3]，我们测试修改后的写回功能
+    int k = 5; // 刷新一次，把之前修改过的ram[3]轮换到下一个要被替换的位置
+    while (k != 3)
+    {
+        mem_read(k, ptr);
+        k++;
+        if (k > 15)
+            k = 0;
+    }
+    mem_read(4, ptr);// 下一个要换出ram[3]，我们测试修改后的写回功能
     mem_read(RAM_SIZE + 8, ptr);
     printf("%x \n", *ptr);
     mem_state();
