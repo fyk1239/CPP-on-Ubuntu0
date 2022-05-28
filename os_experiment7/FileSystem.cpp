@@ -60,26 +60,63 @@ bool createFile(const char *vFileName, int vDirInodeNum, char FileType, int vFil
 	}
 	return IsSuccess;
 }
-
+// 从目录中找到文件对应的Inode编号，根据Inode编号读出Inode数据，完成文件的删除
 bool removeFile(const char *vFileName, int vDirInodeNum)
 {
 	SDirectory TempDirectory = loadDirectoryFromDisk(vDirInodeNum);
 
-	//...       从目录中找到文件对应的Inode编号，根据Inode编号读出Inode数据，完成文件的删除
+	int InodeIndex = findFileInodeNum(vFileName, TempDirectory);
+	if (InodeIndex == -1)
+		return false;
 
+	SInode TempInode = loadInodeFromDisk(InodeIndex); // 从虚拟硬盘读取Inode信息
+	if (TempInode.NumLinks == 1)					  // 如果是目录，递归地删除下面的文件
+	{
+		if (TempInode.FileType == 'd')
+		{
+			SDirectory SubDirectory = loadDirectoryFromDisk(InodeIndex);
+			for (int i = 0; i < g_MaxNumFiles; ++i)
+			{
+				if (SubDirectory.FileSet[i].IsInUse)
+					removeFile(SubDirectory.FileSet[i].FileName, InodeIndex);
+			}
+		}
+		SBitMap InodeBitMap;
+		createEmptyBitMap(InodeBitMap, g_NumInodes);
+		memcpy(InodeBitMap.pMapData, g_Disk + g_BlockBitMapSize, g_InodeBitMapSize); // 从虚拟硬盘读取Inode的示图
+
+		SBitMap DataBlockBitMap;
+		createEmptyBitMap(DataBlockBitMap, g_NumBlocks);
+		memcpy(DataBlockBitMap.pMapData, g_Disk, g_BlockBitMapSize);                 // 从虚拟硬盘读取数据块位示图
+
+		deallocateDisk(TempInode, DataBlockBitMap);
+		clearBitAt(InodeIndex, InodeBitMap);
+
+		memcpy(g_Disk, DataBlockBitMap.pMapData, g_BlockBitMapSize);                 // 将数据块位示图写回虚拟硬盘
+		memcpy(g_Disk + g_BlockBitMapSize, InodeBitMap.pMapData, g_InodeBitMapSize); // 将Inode位示图写回虚拟硬盘
+
+		delete DataBlockBitMap.pMapData;
+		delete InodeBitMap.pMapData;
+	}
+	else 
+	{
+		TempInode.NumLinks--;
+		saveInode2Disk(TempInode, InodeIndex);
+	}
+	
 	removeFileFromDirectory(vFileName, TempDirectory);
 	saveDirectory2Disk(vDirInodeNum, TempDirectory); // 将目录内容重新写回虚拟硬盘
 	return true;
 }
-
+// 这里先用全局变量保存Dir，等实现了文件读写再来完成
 SDirectory loadDirectoryFromDisk(int vDirInodeNum)
 {
-	return g_RootDir; // 这里先用全局变量保存Dir，等实现了文件读写再来完成
+	return g_RootDir;
 }
-
+// 这里也是用全局的变量保存目录，等实现了文件读写再来完成
 void saveDirectory2Disk(int vDirInodeNum, const SDirectory &vDirectory)
 {
-	g_RootDir = vDirectory; // 这里也是用全局的变量保存目录，等实现了文件读写再来完成
+	g_RootDir = vDirectory;
 }
 
 void formatDisk()
@@ -125,9 +162,12 @@ bool allocateDisk(SInode &voInode, int vFileSize, SBitMap &vioBlockBitMap)
 	return true;
 }
 
-void deallocateDisk(const SInode &vInode, SBitMap &vioCBitMap)
+void deallocateDisk(const SInode &vInode, SBitMap &vioCBitMap) // 回收磁盘块
 {
-	// 回收磁盘块
+	for (int i = 0; i < vInode.NumBlocks; ++i)
+	{
+		clearBitAt(i, vioCBitMap);
+	}
 }
 
 SInode loadInodeFromDisk(int vInodeNum)

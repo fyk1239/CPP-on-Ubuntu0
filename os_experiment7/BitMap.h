@@ -5,16 +5,16 @@ const short g_NumBitsInWord = sizeof(int) * 8;
 
 struct SBitMap
 {
-	int NumBits;   //Î»Ê¾Í¼´óĞ¡
+	int NumBits; // ä½ç¤ºå›¾å¤§å°
 	int *pMapData;
 };
 
-int countClearBits(const SBitMap& vBitMap);                        //Í³¼ÆvBitMapÃ»ÓĞ±»Õ¼ÓÃµÄÎ»Êı£¨Îª1±íÊ¾Õ¼ÓÃ£¬0±íÊ¾Ã»Õ¼ÓÃ£©
-int findAndSetAvailableBit(SBitMap& voBitMap);                     //·µ»ØµÚÒ»¸öÃ»ÓĞ±»Õ¼ÓÃµÄÎ»£¬²¢½«ÆäÖÃ1;Ã»ÓĞÔò·µ»Ø-1
-bool isAvailableBitAt(int vBitPosition, const SBitMap& vBitMap);   //²âÊÔµÚvBitPositionÎ»ÊÇ·ñÎª0
-void createEmptyBitMap(SBitMap& voBitMap, int vNumTotalBits);      //´´½¨Ò»¸ö´óĞ¡ÎªvNumTotalBitsµÄ¿ÕÎ»Ê¾Í¼
-void markBitAt(int vBitPosition, SBitMap& vioBitMap);              //½«Î»Ê¾Í¼ÖĞµÚvBitPositionÎ»ÖÃÎª1
-void clearBitAt(int vBitPosition, SBitMap& voBitMap);              //½«Î»Ê¾Í¼ÖĞµÚvBitPositionÎ»ÖÃÎª0
-void printfBitMap(const SBitMap& vBitMap);                         //´òÓ¡Î»Ê¾Í¼
+int countClearBits(const SBitMap &vBitMap);						 // ç»Ÿè®¡vBitMapæ²¡æœ‰è¢«å ç”¨çš„ä½æ•°ï¼ˆä¸º1è¡¨ç¤ºå ç”¨ï¼Œ0è¡¨ç¤ºæ²¡å ç”¨ï¼‰
+int findAndSetAvailableBit(SBitMap &voBitMap);					 // è¿”å›ç¬¬ä¸€ä¸ªæ²¡æœ‰è¢«å ç”¨çš„ä½ï¼Œå¹¶å°†å…¶ç½®1;æ²¡æœ‰åˆ™è¿”å›-1
+bool isAvailableBitAt(int vBitPosition, const SBitMap &vBitMap); // æµ‹è¯•ç¬¬vBitPositionä½æ˜¯å¦ä¸º0
+void createEmptyBitMap(SBitMap &voBitMap, int vNumTotalBits);	 // åˆ›å»ºä¸€ä¸ªå¤§å°ä¸ºvNumTotalBitsçš„ç©ºä½ç¤ºå›¾
+void markBitAt(int vBitPosition, SBitMap &vioBitMap);			 // å°†ä½ç¤ºå›¾ä¸­ç¬¬vBitPositionä½ç½®ä¸º1
+void clearBitAt(int vBitPosition, SBitMap &voBitMap);			 // å°†ä½ç¤ºå›¾ä¸­ç¬¬vBitPositionä½ç½®ä¸º0
+void printfBitMap(const SBitMap &vBitMap);						 // æ‰“å°ä½ç¤ºå›¾
 
 #endif
