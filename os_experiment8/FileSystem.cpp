@@ -108,7 +108,7 @@ bool removeFile(const char *vFileName, int vDirInodeNum)
 	saveDirectory2Disk(vDirInodeNum, TempDirectory); // 将目录内容重新写回虚拟硬盘
 	return true;
 }
-// 这里先用全局变量保存Dir，等实现了文件读写再来完成
+// 从硬盘加载目录
 SDirectory loadDirectoryFromDisk(int vDirInodeNum)
 {
 	SOpenFile DirOpenFile;
@@ -122,7 +122,7 @@ SDirectory loadDirectoryFromDisk(int vDirInodeNum)
 
 	return TempDir;
 }
-// 这里也是用全局的变量保存目录，等实现了文件读写再来完成
+// 把目录保存到硬盘
 void saveDirectory2Disk(int vDirInodeNum, const SDirectory &vDirectory)
 {
 	SOpenFile DirOpenFile;
@@ -198,16 +198,16 @@ void saveInode2Disk(const SInode &vInode, int vInodeNum)
 	memcpy(g_Disk + g_BlockBitMapSize + g_InodeBitMapSize + sizeof(SInode) * vInodeNum, &vInode, sizeof(SInode));
 }
 
-SOpenFile *openFile(const char *vFileName) //假设输入的是完整路径，因此从根目录开始查找文件
+SOpenFile *openFile(const char *vFileName) // 假设输入的是完整路径，因此从根目录开始查找文件
 {
-	SDirectory TempDir = loadDirectoryFromDisk(0); //读取根目录内容
+	SDirectory TempDir = loadDirectoryFromDisk(0); // 读取根目录内容
 
 	int FileInodeNum = -1;
 	SInode FileInode;
 	char *pStr = new char[strlen(vFileName) + 1];
 	strcpy(pStr, vFileName);
-	char *pTemp = strtok(pStr, "/"); //以'/'分割字符串
-	while (pTemp != NULL)			 //按路径依次查找文件
+	char *pTemp = strtok(pStr, "/"); // 以'/'分割字符串
+	while (pTemp != NULL)			 // 按路径依次查找文件
 	{
 		FileInodeNum = findFileInodeNum(pTemp, TempDir);
 		if (FileInodeNum == -1)
@@ -222,7 +222,7 @@ SOpenFile *openFile(const char *vFileName) //假设输入的是完整路径，�
 	}
 	delete[] pStr;
 	if (FileInode.FileType == 'd')
-		return NULL; //假如打开的是目录，返回NULL表示不能写入
+		return NULL; // 假如打开的是目录，返回NULL表示不能写入
 
 	SOpenFile *pOpenFile = new SOpenFile();
 	pOpenFile->CurSeekPos = 0;
@@ -235,11 +235,11 @@ int readDataFromFile(void *vDestination, int vNumBytes, SOpenFile &vioFile)
 {
 	int FileLength = vioFile.Inode.FileSize;
 	if ((vNumBytes <= 0) || (vioFile.CurSeekPos >= FileLength))
-		return 0; //读取到了文件末尾
+		return 0; // 读取到了文件末尾
 	if ((vioFile.CurSeekPos + vNumBytes) > FileLength)
 		vNumBytes = FileLength - vioFile.CurSeekPos;
 
-	int FirstBlock = vioFile.CurSeekPos / g_BlockSize; //计算起始和末尾的数据块，这里计算的结果表示Inode.BlockNums[]数组中的下标范围
+	int FirstBlock = vioFile.CurSeekPos / g_BlockSize; // 计算起始和末尾的数据块，这里计算的结果表示Inode.BlockNums[]数组中的下标范围
 	int LastBlock = (vioFile.CurSeekPos + vNumBytes - 1) / g_BlockSize;
 	int NumBlocks = 1 + LastBlock - FirstBlock;
 
@@ -264,14 +264,65 @@ int writeData2File(const void *vSrc, int vNumBytes, SOpenFile &vioFile)
 		return 0;
 
 	if (vioFile.CurSeekPos + vNumBytes > g_MaxFileSize)
-		vNumBytes = g_MaxFileSize - vioFile.CurSeekPos;			 //超过了最大文件长度
-	if (vioFile.CurSeekPos + vNumBytes > vioFile.Inode.FileSize) //如果写入内容超过了文件原始分配的大小，怎么办？
+		vNumBytes = g_MaxFileSize - vioFile.CurSeekPos;			 // 超过了最大文件长度
+	if (vioFile.CurSeekPos + vNumBytes > vioFile.Inode.FileSize) // 如果写入内容超过了文件原始分配的大小
 	{
-		//...
-		//...
+		int TempFileSize = vioFile.CurSeekPos + vNumBytes;				   // 文件大小 = 写入大小
+		int TempNumBlocks = (int)ceil(TempFileSize / (double)g_BlockSize); // 给这个文件分的block数
+		SBitMap DataBlockBitMap;										   // block的bitmap
+		createEmptyBitMap(DataBlockBitMap, g_NumBlocks);
+		memcpy(DataBlockBitMap.pMapData, g_Disk, g_BlockBitMapSize); // 从虚拟硬盘读取数据块位示图
+
+		int NumFreeBlock = countClearBits(DataBlockBitMap);			  // 空的数量
+		if (TempNumBlocks > (NumFreeBlock + vioFile.Inode.NumBlocks)) // 修正写的文件大小
+		{
+			TempNumBlocks = NumFreeBlock + vioFile.Inode.NumBlocks;
+			vNumBytes = TempNumBlocks * g_BlockSize - vioFile.CurSeekPos;
+		}
+		for (int i = vioFile.Inode.NumBlocks; i < TempNumBlocks; ++i) // 写进去
+			vioFile.Inode.BlockNums[i] = findAndSetAvailableBit(DataBlockBitMap);
+
+		memcpy(g_Disk, DataBlockBitMap.pMapData, g_BlockBitMapSize); // 将数据块位示图写回虚拟硬盘
+		delete DataBlockBitMap.pMapData;
+
+		vioFile.Inode.FileSize = vNumBytes + vioFile.CurSeekPos; // 更新inode信息
+		vioFile.Inode.NumBlocks = TempNumBlocks;
+		saveInode2Disk(vioFile.Inode, vioFile.InodeNum);
 	}
 
-	//完成文件的写入
-	//...
-	//...
+	// 完成文件的写入
+	int FirstBlock = vioFile.CurSeekPos / g_BlockSize;
+	int LastBlock = (vioFile.CurSeekPos + vNumBytes - 1) / g_BlockSize;
+	int NumBlocks = 1 + LastBlock - FirstBlock;
+
+	char *pBuff = new char[NumBlocks * g_BlockSize];
+	char *pDiskDataPos = g_Disk + g_BlockBitMapSize + g_InodeBitMapSize + sizeof(SInode) * g_NumInodes;
+
+	bool IsFirstBlockAligned = (vioFile.CurSeekPos == (FirstBlock * g_BlockSize));
+	bool IsLastBlockAligned = ((vioFile.CurSeekPos + vNumBytes) == ((LastBlock + 1) * g_BlockSize));
+
+	if (!IsFirstBlockAligned) // 第一个数据块是否对齐
+	{
+		int BlockNum = vioFile.Inode.BlockNums[FirstBlock];
+		memcpy(pBuff, pDiskDataPos + g_BlockSize * BlockNum, g_BlockSize);
+	}
+
+	if (!IsFirstBlockAligned) // 最后一个数据块没有对齐
+	{
+		int BlockNum = vioFile.Inode.BlockNums[LastBlock];
+		memcpy(pBuff + g_BlockSize * (NumBlocks - 1), pDiskDataPos + g_BlockSize * BlockNum, g_BlockSize);
+	}
+
+	char *pTemp = pBuff;
+	memcpy(&pBuff[vioFile.CurSeekPos % g_BlockSize], vSrc, vNumBytes);
+	for (int i = FirstBlock; i <= LastBlock; ++i) // 将数据按块重新写回
+	{
+		int BlockNum = vioFile.Inode.BlockNums[i];
+		memcpy(pDiskDataPos + g_BlockSize * BlockNum, pTemp, g_BlockSize);
+		pTemp += g_BlockSize;
+	}
+
+	delete[] pBuff;
+	vioFile.CurSeekPos += vNumBytes;
+	return vNumBytes;
 }
